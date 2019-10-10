@@ -1,139 +1,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-
-enum cp_tag{
-	    CONSTANT_Utf8                   = 1,
-	    CONSTANT_Integer                = 3,
-	    CONSTANT_Float                  = 4,
-	    CONSTANT_Long                   = 5,
-	    CONSTANT_Double                 = 6,
-	    CONSTANT_Class                  = 7,
-	    CONSTANT_String                 = 8,
-	    CONSTANT_Fieldref               = 9,
-	    CONSTANT_Methodref              = 10,
-	    CONSTANT_InterfaceMethodref     = 11,
-	    CONSTANT_NameAndType            = 12,
-	    CONSTANT_MethodHandle           = 15,
-	    CONSTANT_MethodType             = 16,
-	    CONSTANT_InvokeDynamic          = 18,
-	    CONSTANT_Module                 = 19,
-	    CONSTANT_Package                = 20
-};
-
-enum acc_flag{
-	      ACC_PUBLIC = 0x0001,
-	      ACC_PRIVATE = 0x0002,
-	      ACC_PROTECTED = 0x0004,
-	      ACC_STATIC = 0x0008,
-	      ACC_FINAL = 0x0010,
-	      ACC_SUPER = 0x0020,
-	      ACC_VOLATILE = 0x0040,
-	      ACC_TRANSIENT = 0x0080,
-	      ACC_INTERFACE = 0x0200,
-	      ACC_ABSTRACT = 0x0400,
-	      ACC_SYNTHETIC = 0x1000,
-	      ACC_ANNOTATION = 0x2000,
-	      ACC_ENUM = 0x4000,
-	      ACC_MODULE = 0x8000
-};
-
-/* structs for CP entries */
-
-struct CONSTANT_Class_info {
-    char tag;
-    short name_index;
-};
-
-
-struct CONSTANT_Fieldref_info {
-    char tag;
-    short class_index;
-    short name_and_type_index;
-};
-
-struct CONSTANT_Methodref_info {
-    char tag;
-    short class_index;
-    short name_and_type_index;
-};
-
-struct CONSTANT_InterfaceMethodref_info {
-    char tag;
-    short class_index;
-    short name_and_type_index;
-};
-
-struct CONSTANT_String_info {
-    char tag;
-    short string_index;
-};
-
-struct CONSTANT_Integer_info {
-    char tag;
-    int data;
-};
-
-struct CONSTANT_Float_info {
-    char tag;
-    float data;
-};
-
-struct CONSTANT_Long_info {
-    char tag;
-    long data;
-};
-
-struct CONSTANT_Double_info {
-    char tag;
-  double data;
-};
-
-struct CONSTANT_NameAndType_info {
-    char tag;
-    short name_index;
-    short descriptor_index;
-};
-
-struct CONSTANT_Utf8_info {
-    char tag;
-    short length;
-    char* data;
-};
-
-struct CONSTANT_MethodHandle_info {
-    char tag;
-    char reference_kind;
-    short reference_index;
-};
-
-struct CONSTANT_MethodType_info {
-    char tag;
-    short descriptor_index;
-};
-
-struct CONSTANT_InvokeDynamic_info {
-    char tag;
-    short bootstrap_method_attr_index;
-    short name_and_type_index;
-};
-
-
-struct CONSTANT_Module_info {
-    char tag;
-    short name_index;
-};
-
-struct CONSTANT_Package_info {
-    char tag;
-    short name_index;
-};
-
+#include "classdump.h"
 /**
  * help functions for file reading
  */
 
-char getchar(FILE* f){
+char getachar(FILE* f){
   int i = fgetc(f);
   if (i == EOF){
     exit(1);
@@ -150,15 +23,41 @@ short getshort(FILE* f){
   if (j == EOF){
     exit(1);
   }
-  return (short)((i << 8) + j);
+  
+  //fprintf(stderr,"+ len1:0x%02X\tlen2:0x%02X\tlen:0x%02X\n", i,j,((i << 8) | j));
+  return (short)((i << 8) | j);
+}
+
+int getint(FILE* f){
+  int i = getshort(f);
+  int j = getshort(f);
+  return ((i << 16) | j);
 }
 
 char* getnbytes(FILE* f, int n){
   char buf[n+1];
+  
+  int i = 0;
+  while(i < n){
+    buf[i] = fgetc(f);
+    if(buf[i] == EOF) {exit(1);}
+    //printf("#%d:0x%X\n", i, buf[i]);
+    i ++;
+  }
+  buf[i] = 0;
+  
+  /*
   if(fgets(buf, n+1, f) == NULL){
     exit(1);
   }
-  return strdup(buf);
+
+  printbytes(buf, n);
+  */
+  char* ret = (char*)malloc(sizeof(char) * (n+1));
+  memcpy(ret, buf, sizeof(char)*n);
+  ret[n] = 0;
+  return ret;
+  //return strndup(buf, n);
 }
 
 /**
@@ -167,6 +66,9 @@ char* getnbytes(FILE* f, int n){
 void printbytes(char* s, int len){
   for (int i = 0; i < len; i ++){
     printf("%02X%c", s[i] > 0xFFFFFF00? s[i] - 0xFFFFFF00 : s[i], s[i] > 0xFFFFFF00? '*':' ');
+    if (!((i + 1)%8)){
+      printf("\n");
+    }
   }
   printf("\n");
 }
@@ -268,77 +170,77 @@ void print_cp(void** cp, short len){
 	struct CONSTANT_Utf8_info * e
 	  = (struct CONSTANT_Utf8_info *)v_ptr;
 	
-	printf("Tag: Utf8\n");
-	printf("Data: \"%s\"\n", e->data);
+	printf("+ Tag: Utf8\n");
+	printf("+ Data: \"%s\"\n", e->data);
       }
       break;
     case CONSTANT_Integer:
       {
-	printf("Tag: Integer\n");
+	printf("+ Tag: Integer\n");
 	struct CONSTANT_Integer_info * e
 	  = (struct CONSTANT_Integer_info *)v_ptr;
-	printf("Data: %d\n", e->data);
+	printf("+ Data: %d\n", e->data);
       }
       break;
     case CONSTANT_Float:
       {
-	printf("Tag: Float\n");
+	printf("+ Tag: Float\n");
 	struct CONSTANT_Float_info * e
 	  = (struct CONSTANT_Float_info *)v_ptr;
 	
-	printf("Data: %f\n", e->data);
+	printf("+ Data: %f\n", e->data);
       }
       break;
     case CONSTANT_Long:
       {
-	printf("Tag: Long\n");
+	printf("+ Tag: Long\n");
         
 	struct CONSTANT_Long_info * e
 	  = (struct CONSTANT_Long_info *)v_ptr;
 	
-	printf("Data: %ld\n", e->data);
+	printf("+ Data: %ld\n", e->data);
       }
       break;
     case CONSTANT_Double:
       {
-	printf("Tag: Double\n");
+	printf("+ Tag: Double\n");
 	struct CONSTANT_Double_info * e
 	  = (struct CONSTANT_Double_info *)v_ptr;
-        printf("Data: %lf\n", e->data);
+        printf("+ Data: %lf\n", e->data);
       }
       break;
     case CONSTANT_Class:
       {
-	printf("Tag: Class\n");
+	printf("+ Tag: Class\n");
 
 	struct CONSTANT_Class_info * e
 	  = (struct CONSTANT_Class_info *)v_ptr;
-	printf("name_index: #%d\t<%s>\n", e->name_index,
+	printf("+ name_index: #%d\n++ <%s>\n", e->name_index,
 	       ((struct CONSTANT_Utf8_info *)(cp[e->name_index]))->data);
       }
       break;
     case CONSTANT_String:
       {
-	printf("Tag: String\n");
+	printf("+ Tag: String\n");
 
 	struct CONSTANT_String_info * e
 	  = (struct CONSTANT_String_info *)v_ptr;
-	printf("string_index: #%d\t<%s>\n", e->string_index,
+	printf("+ string_index: #%d\n++ <%s>\n", e->string_index,
 	       ((struct CONSTANT_Utf8_info *)(cp[e->string_index]))->data);
       }
       break;
     case CONSTANT_Fieldref:
       {
-	printf("Tag: Fieldref\n");
+	printf("+ Tag: Fieldref\n");
 	struct CONSTANT_Fieldref_info * e
 	  = (struct CONSTANT_Fieldref_info *)v_ptr;
 
 	short class_name_index = ((struct CONSTANT_Class_info *)(cp[e->class_index]))->name_index;
-	printf("class_index: #%d\t<Class %s>\n", e->class_index,
+	printf("+ class_index: #%d\n++ <Class %s>\n", e->class_index,
 	       ((struct CONSTANT_Utf8_info *)(cp[class_name_index]))->data);
 
 	struct CONSTANT_NameAndType_info *nt_info = (struct CONSTANT_NameAndType_info *)(cp[e->name_and_type_index]);
-	printf("name_and_type_index: #%d\t<Name:%s, Type:%s>\t", e->name_and_type_index,
+	printf("+ name_and_type_index: #%d\n++ <Name:%s, Type:%s>\n+++ ", e->name_and_type_index,
 	       ((struct CONSTANT_Utf8_info *)(cp[nt_info->name_index]))->data,
 	       ((struct CONSTANT_Utf8_info *)(cp[nt_info->descriptor_index]))->data);
 	parse_descriptor(((struct CONSTANT_Utf8_info *)(cp[nt_info->descriptor_index]))->data);
@@ -347,16 +249,16 @@ void print_cp(void** cp, short len){
       break;
     case CONSTANT_Methodref:
       {
-	printf("Tag: Methodref\n");
+	printf("+ Tag: Methodref\n");
 	struct CONSTANT_Methodref_info * e
 	  = (struct CONSTANT_Methodref_info *)v_ptr;
 
 	short class_name_index = ((struct CONSTANT_Class_info *)(cp[e->class_index]))->name_index;
-	printf("class_index: #%d\t<Class %s>\n", e->class_index,
+	printf("+ class_index: #%d\n++ <Class %s>\n", e->class_index,
 	       ((struct CONSTANT_Utf8_info *)(cp[class_name_index]))->data);
 	
 	struct CONSTANT_NameAndType_info *nt_info = (struct CONSTANT_NameAndType_info *)(cp[e->name_and_type_index]);
-	printf("name_and_type_index: #%d\t<Name:%s, Type:%s>\n", e->name_and_type_index,
+	printf("+ name_and_type_index: #%d\n++ <Name:%s, Type:%s>\n+++ ", e->name_and_type_index,
 	       ((struct CONSTANT_Utf8_info *)(cp[nt_info->name_index]))->data,
 	       ((struct CONSTANT_Utf8_info *)(cp[nt_info->descriptor_index]))->data);
       }
@@ -364,37 +266,37 @@ void print_cp(void** cp, short len){
       break;
     case CONSTANT_InterfaceMethodref:
       {
-	printf("Tag: InterfaceMethodref\n");
+	printf("+ Tag: InterfaceMethodref\n");
 	struct CONSTANT_InterfaceMethodref_info * e
 	  = (struct CONSTANT_InterfaceMethodref_info *)v_ptr;
 
 	short class_name_index = ((struct CONSTANT_Class_info *)(cp[e->class_index]))->name_index;
-	printf("class_index: #%d\t<Class %s>\n", e->class_index,
+	printf("+ class_index: #%d\n++ <Class %s>\n", e->class_index,
 	       ((struct CONSTANT_Utf8_info *)(cp[class_name_index]))->data);
 	
 	struct CONSTANT_NameAndType_info *nt_info = (struct CONSTANT_NameAndType_info *)(cp[e->name_and_type_index]);
-	printf("name_and_type_index: #%d\t<Name:%s, Type:%s>\n", e->name_and_type_index,
+	printf("+ name_and_type_index: #%d\n++ <Name:%s, Type:%s>\n+++ ", e->name_and_type_index,
 	       ((struct CONSTANT_Utf8_info *)(cp[nt_info->name_index]))->data,
 	       ((struct CONSTANT_Utf8_info *)(cp[nt_info->descriptor_index]))->data);
       }
       break;
     case CONSTANT_NameAndType:
       {
-	printf("Tag: NameAndType\n");
+	printf("+ Tag: NameAndType\n");
 
 	struct CONSTANT_NameAndType_info * e
 	  = (struct CONSTANT_NameAndType_info *)v_ptr;
 
-	printf("name_index: #%d\t<%s>\n", e->name_index,
+	printf("+ name_index: #%d\n++ <%s>\n", e->name_index,
 	       ((struct CONSTANT_Utf8_info *)(cp[e->name_index]))->data);
 	
-	printf("descriptor_index: #%d\t<%s>\n", e->descriptor_index,
+	printf("+ descriptor_index: #%d\n++ <%s>\n", e->descriptor_index,
 	       ((struct CONSTANT_Utf8_info *)(cp[e->descriptor_index]))->data);
       }
       break;
     case CONSTANT_MethodHandle:
       {
-	printf("Tag: MethodHandle\n");
+	printf("+ Tag: MethodHandle\n");
 	
 	struct CONSTANT_MethodHandle_info * e
 	  = (struct CONSTANT_MethodHandle_info *)v_ptr;
@@ -402,47 +304,48 @@ void print_cp(void** cp, short len){
       break;
     case CONSTANT_MethodType:
       {
-	printf("Tag: MethodType\n");
+	printf("+ Tag: MethodType\n");
 	struct CONSTANT_MethodType_info * e
 	  = (struct CONSTANT_MethodType_info *)v_ptr;
-	printf("descriptor_index: #%d\t<%s>\n", e->descriptor_index,
+	printf("+ descriptor_index: #%d\n++ <%s>\n", e->descriptor_index,
 	       ((struct CONSTANT_Utf8_info *)(cp[e->descriptor_index]))->data);
       }
       break;
     case CONSTANT_InvokeDynamic:
       {
-	printf("Tag: InvokeDynamic\n");
+	printf("+ Tag: InvokeDynamic\n");
 	struct CONSTANT_InvokeDynamic_info * e
 	  = (struct CONSTANT_InvokeDynamic_info *)v_ptr;
       }
       break;
     case CONSTANT_Module:
       {
-	printf("Tag: Module\n");
+	printf("+ Tag: Module\n");
 	
 	struct CONSTANT_Module_info * e
 	  = (struct CONSTANT_Module_info *)v_ptr;
-	printf("name_index: #%d\t<%s>\n", e->name_index,
+	printf("+ name_index: #%d\n++ <%s>\n", e->name_index,
 	       ((struct CONSTANT_Utf8_info *)(cp[e->name_index]))->data);
       }
       break;
     case CONSTANT_Package:
       {
-	printf("Tag: Package\n");
+	printf("+ Tag: Package\n");
 	struct CONSTANT_Package_info * e
 	  = (struct CONSTANT_Package_info *)v_ptr;
-	printf("name_index: #%d\t<%s>\n", e->name_index,
+	printf("+ name_index: #%d\n++ <%s>\n", e->name_index,
 	       ((struct CONSTANT_Utf8_info *)(cp[e->name_index]))->data);
       }
       break;
     }
+    printf("+++++++++++++++++\n");
   }
 }
 
 /**
  * help function to check access flags
  */
-void access_flag_check(short accflg){
+void access_flag_check(short accflg, int isMethod){
   if(accflg & ACC_PUBLIC){
     printf("ACC_PUBLIC\t");
   }
@@ -459,19 +362,35 @@ void access_flag_check(short accflg){
     printf("ACC_FINAL\t");
   }
   if(accflg & ACC_VOLATILE){
-    printf("ACC_VOLATILE\t");
+    if(isMethod)
+      printf("ACC_BRIDGE\t");
+    else
+      printf("ACC_VOLATILE\t");
   }
   if(accflg & ACC_TRANSIENT){
-    printf("ACC_TRANSIENT\t");
+    if(isMethod)
+      printf("ACC_VARARGS\t");
+    else
+      printf("ACC_TRANSIENT\t");
+    
   }
   if(accflg & ACC_SUPER){
-    printf("ACC_SUPER\t");
+    if(isMethod)
+      printf("ACC_SYNCHRONIZED");
+    else
+      printf("ACC_SUPER\t");
+  }
+  if(accflg & ACC_NATIVE){
+    printf("ACC_NATIVE\t");
   }
   if(accflg & ACC_INTERFACE){
     printf("ACC_INTERFACE\t");
   }
   if(accflg & ACC_ABSTRACT){
     printf("ACC_ABSTRACT\t");
+  }
+  if(accflg & ACC_STRICT){
+    printf("ACC_STRICT\t");
   }
   if(accflg & ACC_SYNTHETIC){
     printf("ACC_SYNTHETIC\t");
@@ -488,8 +407,237 @@ void access_flag_check(short accflg){
   //printf("\n");
 }
 
-void parse_attr(FILE *f){
+void parse_attr(FILE *f, void**cp){
+  short name_index = getshort(f);
+  char* name = get_cp_utf8(cp, name_index);
+  //printf("name index: #%d\n", name_index);
+  int len = getint(f);
+  printf("\n+++++ ATTR:%s +++++\n", name);
+  printf("+ len:%d\n",len);
 
+  if(!strcmp(name, "ConstantValue")){
+    short value_index = getshort(f);
+    printf("+ contant value index:%d\n", value_index);
+    char* e = (char*)(cp[value_index]);
+    
+    switch(e[0]){
+    case CONSTANT_Long:
+      {
+	printf("++ type: long\n");
+	struct CONSTANT_Long_info* d = (struct CONSTANT_Long_info*)e;
+	printf("++ value: %ld\n", d->data);
+      }
+    break;
+    case CONSTANT_Float:
+      {
+	printf("++ type: float\n");
+	struct CONSTANT_Float_info* d = (struct CONSTANT_Float_info*)e;
+	printf("++ value: %f\n", d->data);
+      }
+    break;
+    case CONSTANT_Double:
+      {
+	printf("++ type: double\n");
+	struct CONSTANT_Double_info* d = (struct CONSTANT_Double_info*)e;
+	printf("++ value: %lf\n", d->data);
+      }
+    break;
+    case CONSTANT_Integer:
+      {
+	printf("++ type: int/short/char/byte/boolean\n");
+	struct CONSTANT_Integer_info* d = (struct CONSTANT_Integer_info*)e;
+	printf("++ value: %d\n", d->data);
+      }
+    break;
+    case CONSTANT_String:
+      {
+	printf("++ type: String\n");
+	struct CONSTANT_String_info* d = (struct CONSTANT_String_info*)e;
+	printf("++ value: %s\n", get_cp_utf8(cp, d->string_index));
+      }
+    break;
+    }
+  } else if(!strcmp(name, "Code")){
+    /**
+     * Code Attribute:
+     * u2 - max_stack
+     * u2 - max_locals
+     * u4 - code_length
+     * u1 - code[code_length]
+     * u2 - exception_table_length
+     * u8 - exception_table
+     * u2 - attributes_count
+     * attribute_info attributes[attributes_count]
+     */
+    //char* code = getnbytes(f, len);
+    short max_stack = getshort(f);
+    short max_locals = getshort(f);
+    printf("++ max_stack: %d\n", max_stack);
+    printf("++ max_locals: %d\n", max_locals);
+    int code_len = getint(f);
+    printf("++ code_length: %d\n", code_len);
+    char* code = getnbytes(f, code_len);
+    printf("+++ Code +++\n\n");
+    printbytes(code, code_len);
+    printf("\n+++ End of Code +++\n\n");
+    
+    short ex_len = getshort(f);
+    printf("++ exception_table_length: %d\n", ex_len);
+    for(short i = 0; i < ex_len; i++){
+      printf("+++ Exception %d\n\n", i+1);
+      short start_pc = getshort(f);
+      short end_pc = getshort(f);
+      short handler_pc = getshort(f);
+      short catch_type = getshort(f);
+      printf("+++ start_pc: #%d\n", start_pc);
+      printf("+++ end_pc: #%d\n", end_pc);
+      printf("+++ handler_pc: #%d\n", handler_pc);
+      printf("+++ catch_type: #%d\n", catch_type);
+    }
+
+    short att_len = getshort(f);
+    printf("++ attribute_count: %d\n", att_len);
+    if(att_len){
+      printf("+++ Attributes \n\n");
+      for(short i = 0; i < att_len; i ++){
+	parse_attr(f, cp);
+      }
+      printf("+++ End of Attributes \n\n");  
+    }
+    
+  } else if(!strcmp(name, "StackMapTable")){
+    short num_of_entries = getshort(f);
+    printf("+ number of entries: %d\n", num_of_entries);
+    for(short i = 0; i < num_of_entries; i++){
+      printf("++ENTRY %d\n", i);
+      parse_stack_map_frame(f);
+    }
+  } else if(!strcmp(name, "Exceptions")){
+    char* info = getnbytes(f, 10);
+  } else if(!strcmp(name, "InnerClasses")){
+    char* info = getnbytes(f, 6);
+    short num = getshort(f);
+    for(short i = 0; i < num; i++){
+      char* classinfo = getnbytes(f, 8);
+    }
+  } else if(!strcmp(name, "EnclosingMethod")){
+    char* info = getnbytes(f, 4);
+  } else if(!strcmp(name, "Synthetic")){
+    
+  } else if(!strcmp(name, "Signature")){
+    short info = getshort(f);
+  } else if(!strcmp(name, "SourceFile")){
+    short info = getshort(f);
+  } else if(!strcmp(name, "SourceDebugExtension")){
+    char* info = getnbytes(f, 1);
+  } else if(!strcmp(name, "LineNumberTable")){
+    
+    short num = getshort(f);
+    printf("+ line_number_table_length: %d\n", num);
+    for(short i = 0; i < num; i++){
+      printf("++ line_number_table_entry %d +++\n", i);
+      short start_pc = getshort(f);
+      short line_num = getshort(f);
+      
+      printf("+++ start_pc: %d\n", start_pc);
+      printf("+++ line_number: %d\n", line_num);
+    }
+  } else{
+    getnbytes(f, len);
+  }
+
+
+  
+}
+
+void parse_verification_type_info(FILE *fp){
+  char tag = getachar(fp);
+  
+  switch (tag){
+  case ITEM_Top:
+    printf("++++ verification type: top\n");
+    break;
+  case ITEM_Integer:
+    printf("++++ verification type: int\n");
+    break;
+  case ITEM_Float:
+    printf("++++ verification type: float\n");
+    break;
+  case ITEM_Null:
+    printf("++++ verification type: null\n");
+    break;
+  case ITEM_UninitializedThis:
+    printf("++++ verification type: uninitializedThis\n");
+    break;
+  case ITEM_Object:
+    {
+      printf("++++ verification type: Object\n");
+      short cp_index = getshort(fp);
+    }
+    break;
+  case ITEM_Uninitialized:
+    {
+      short off = getshort(fp);
+      printf("++++ verification type: uninitialized (offset:%d)\n", off);
+    }
+    break;
+  case ITEM_Long:
+    printf("++++ verification type: long\n");
+    break;
+  case ITEM_Double:
+    printf("++++ verification type: double\n");
+    break;
+  }
+}
+
+void parse_stack_map_frame(FILE *fp){
+  char tag = getachar(fp);
+  if(tag < 0){
+    fprintf(stderr, "error in parse_stack_map_frame\n");
+  } else if (tag < 64){
+    printf("+++ same_frame\n");
+    printf("+++ offset_delta: %d\n", tag);
+  } else if (tag < 128){
+    printf("+++ same_locals_1_stack_item_frame\n");
+    printf("+++ delta_offset: %d\n", tag - 64);
+    parse_verification_type_info(fp);
+  } else if (tag < 247){
+    fprintf(stderr, "reserved value in parse_stack_map_frame\n");
+  } else if (tag == 247){
+    printf("+++ same_locals_1_stack_item_frame_extended\n");
+    short offset = getshort(fp);
+    printf("+++ offset_delta: %d\n", offset);
+    parse_verification_type_info(fp);
+  } else if (tag < 251){
+    printf("+++ chop_frame\n");
+    short offset = getshort(fp);
+    printf("+++ offset_delta: %d\n", offset);
+  } else if (tag == 251){
+    printf("+++ same_frame_extended\n");
+    short offset = getshort(fp);
+    printf("+++ offset_delta: %d\n", offset);
+  }  else if (tag < 255){
+    printf("+++ append_frame\n");
+    short offset = getshort(fp);
+    printf("+++ offset_delta: %d\n", offset);
+    for(short i = 0; i < tag-251; i++){
+      parse_verification_type_info(fp);
+    }
+  }  else if (tag == 255){
+    printf("+++ full_frame\n");
+    short offset = getshort(fp);
+    printf("+++ offset_delta: %d\n", offset);
+    short num_of_locals = getshort(fp);
+    printf("+++ locals count: %d\n", num_of_locals);
+    for(short i = 0; i < num_of_locals; i ++){
+      parse_verification_type_info(fp);
+    }
+    short num_of_items = getshort(fp);
+    printf("+++ stack items count: %d\n", num_of_items);
+    for(short i = 0; i < num_of_items; i ++){
+      parse_verification_type_info(fp);
+    }
+  }
 }
 
 int main(int argc, char **argv)
@@ -519,15 +667,22 @@ int main(int argc, char **argv)
   printf("%d.%d\n", major_ver, minor_ver);
 
   /* get constant pool info*/
+  
+  printf("*******************\n");
+  printf("*******************\n");
+  printf("*  Constant Pool  *\n");
+  printf("*******************\n");
+  printf("*******************\n");
+  
   short cp_count = getshort(fp);
-  printf("=====Constant Pool=====\n\t");
+  //printf("=====Constant Pool=====\n\t");
   printf("Size:%d\n", cp_count);
 
   void** cp = (void**) malloc(sizeof(void*) * cp_count);
   
   for(short i = 1; i < cp_count; i++){
     //get the tag
-    char tag = getchar(fp);
+    char tag = getachar(fp);
     switch(tag){
     case CONSTANT_Utf8:
       {
@@ -543,8 +698,8 @@ int main(int argc, char **argv)
       break;
     case CONSTANT_Integer:
       {
-	char* bytes_int = getnbytes(fp, 4);
-	int data = (((int)bytes_int[0]) << 24) + (((int)bytes_int[1]) << 16) + (((int)bytes_int[2]) << 8) + ((int)bytes_int[3]);
+	//char* bytes_int = getnbytes(fp, 4);
+	int data = getint(fp);
 
 	struct CONSTANT_Integer_info * e
 	  = (struct CONSTANT_Integer_info *)malloc(sizeof(struct CONSTANT_Integer_info));
@@ -555,9 +710,7 @@ int main(int argc, char **argv)
       break;
     case CONSTANT_Float:
       {
-	char* bytes_int = getnbytes(fp, 4);
-	int int_data = (((int)bytes_int[0]) << 24) + (((int)bytes_int[1]) << 16)
-	  + (((int)bytes_int[2]) << 8) + ((int)bytes_int[3]);
+	int int_data = getint(fp);
 	union{
 	  int x;
 	  float y;
@@ -682,7 +835,7 @@ int main(int argc, char **argv)
       break;
     case CONSTANT_MethodHandle:
       {
-	char data1 = getchar(fp);
+	char data1 = getachar(fp);
 	short data2 = getshort(fp);
 	
 	struct CONSTANT_MethodHandle_info * e
@@ -748,7 +901,7 @@ int main(int argc, char **argv)
   /* access flag */
   short access_flag = getshort(fp);
   printf("access_flag:\t\t0x%04X\n  ", access_flag);
-  access_flag_check(access_flag);
+  access_flag_check(access_flag, 0);
   printf("\n");
 
   /* this class */
@@ -772,6 +925,12 @@ int main(int argc, char **argv)
   }
 
   /* fields */
+  printf("*******************\n");
+  printf("*******************\n");
+  printf("*   F i e l d s   *\n");
+  printf("*******************\n");
+  printf("*******************\n");
+  
   short fields_count = getshort(fp);
   printf("fields_count:\t\t%d\n", fields_count);
   for (short i = 0; i < fields_count; i ++){
@@ -780,7 +939,7 @@ int main(int argc, char **argv)
     printf("access_flag:\t\t0x%04X\n", f_acc_flag);
     if(f_acc_flag){
       printf("\t");
-      access_flag_check(access_flag);
+      access_flag_check(f_acc_flag, 0);
       printf("\n");
     }
     
@@ -794,14 +953,71 @@ int main(int argc, char **argv)
     parse_descriptor(get_cp_utf8(cp, f_descriptor));
 
     short f_att_count = getshort(fp);
-    printf("f_att_coun:\t\t%d\n", f_att_count);
+    printf("f_att_count:\t\t%d\n", f_att_count);
     if(f_att_count){
       for(short j = 0; j < f_att_count; j++){
-	parse_attr(fp);
+	parse_attr(fp, cp);
       }
     }
     printf("\n");
   }
 
+  /* methods */
+  
+  printf("*******************\n");
+  printf("*******************\n");
+  printf("*  M e t h o d s  *\n");
+  printf("*******************\n");
+  printf("*******************\n");
+  
+  short methods_count = getshort(fp);
+  printf("methods_count:\t\t%d\n", methods_count);
+  for (short i = 0; i < methods_count; i ++){
+    printf("========================\n");
+    printf("-----method_info %d-----\n", i);
+    printf("========================\n");
+    short m_acc_flag = getshort(fp);
+    printf("access_flag:\t\t0x%04X\n", m_acc_flag);
+    if(m_acc_flag){
+      printf("\t");
+      access_flag_check(m_acc_flag, 1);
+      printf("\n");
+    }
+    short f_name = getshort(fp);
+    printf("name_index:\t\t#%d\n", f_name);
+    printf("     <name: %s>\n", get_cp_utf8(cp, f_name));
+    
+    short f_descriptor = getshort(fp);
+    printf("descriptor_index:\t#%d\n", f_descriptor);
+    printf("     <descriptor: %s>\n", get_cp_utf8(cp, f_descriptor));
+    
+    //parse_descriptor(get_cp_utf8(cp, f_descriptor));
+
+    short f_att_count = getshort(fp);
+    printf("f_att_count:\t\t%d\n", f_att_count);
+    if(f_att_count){
+      for(short j = 0; j < f_att_count; j++){
+	parse_attr(fp, cp);
+      }
+    }
+    printf("\n");
+  }
+
+  printf("*******************\n");
+  printf("*******************\n");
+  printf("*    Attributes   *\n");
+  printf("*******************\n");
+  printf("*******************\n");
+
+  short att_count = getshort(fp);
+  printf("Attributes Count: %d", att_count);
+  if(att_count){
+    for(short j = 0; j < att_count; j++){
+      parse_attr(fp, cp);
+    }
+  }
+  printf("\n");
+
+  printf("\n\n====End of Class File====\n");
   
 }
